@@ -1,0 +1,185 @@
+@baseUrl = http://localhost:3000
+@passAna = {{$dotenv PASS_ANA}}
+@passBruno = {{$dotenv PASS_BRUNO}}
+@passIncorrecta = {{$dotenv PASS_INCORRECTA}}
+
+###############################################################
+# Salud y registro (TODO 1–3)
+###############################################################
+
+### 1. GET /health - BD conectada · 200
+GET {{baseUrl}}/health
+
+### 2. POST /register - Ana · 201 sin contrasena, rol Cliente
+POST {{baseUrl}}/api/v1/auth/register
+Content-Type: application/json
+
+{"nombre":"Ana","correo":"ana.s24@example.com","contrasena":"{{passAna}}"}
+
+### 3. POST /register - Bruno · 201
+POST {{baseUrl}}/api/v1/auth/register
+Content-Type: application/json
+
+{"nombre":"Bruno","correo":"bruno.s24@example.com","contrasena":"{{passBruno}}"}
+
+### 4. POST /register - Correo repetido · 409
+POST {{baseUrl}}/api/v1/auth/register
+Content-Type: application/json
+
+{"nombre":"Ana otra vez","correo":"ana.s24@example.com","contrasena":"{{passAna}}"}
+
+### 5. POST /register - Intento de elegir rol · 400
+POST {{baseUrl}}/api/v1/auth/register
+Content-Type: application/json
+
+{"nombre":"Mallory","correo":"mallory.s24@example.com","contrasena":"{{passAna}}","rol":"Administrador"}
+
+### 6. POST /register - 37 "á" = 74 bytes UTF-8 · 400
+POST {{baseUrl}}/api/v1/auth/register
+Content-Type: application/json
+
+{"nombre":"Larga","correo":"larga.s24@example.com","contrasena":"ááááááááááááááááááááááááááááááááááááá"}
+
+###############################################################
+# Login y JWT (TODO 4)
+###############################################################
+
+### 7. POST /login - Contraseña incorrecta · 401
+POST {{baseUrl}}/api/v1/auth/login
+Content-Type: application/json
+
+{"correo":"ana.s24@example.com","contrasena":"{{passIncorrecta}}"}
+
+### 8. POST /login - Ana · 200 con accessToken
+# @name loginAna
+POST {{baseUrl}}/api/v1/auth/login
+Content-Type: application/json
+
+{"correo":"ana.s24@example.com","contrasena":"{{passAna}}"}
+
+### 9. POST /login - Bruno · 200
+# @name loginBruno
+POST {{baseUrl}}/api/v1/auth/login
+Content-Type: application/json
+
+{"correo":"bruno.s24@example.com","contrasena":"{{passBruno}}"}
+
+###############################################################
+# Identidad actual (TODO 9)
+###############################################################
+
+### 10. GET /me - Ana · 200 sin contrasena
+GET {{baseUrl}}/api/v1/auth/me
+Authorization: Bearer {{loginAna.response.body.accessToken}}
+
+### 11. GET /me - Sin token · 401
+GET {{baseUrl}}/api/v1/auth/me
+
+###############################################################
+# Tareas por propietario (TODO 5–6)
+###############################################################
+
+### 12. POST /tasks - Ana crea su tarea · 201
+# @name tareaAna
+POST {{baseUrl}}/api/v1/tasks
+Authorization: Bearer {{loginAna.response.body.accessToken}}
+Content-Type: application/json
+
+{"titulo":"Preparar entrega final","prioridad":"alta"}
+
+### 13. POST /tasks - Body con propietario · 400
+POST {{baseUrl}}/api/v1/tasks
+Authorization: Bearer {{loginAna.response.body.accessToken}}
+Content-Type: application/json
+
+{"titulo":"Tarea a nombre de otro","propietario":"507f1f77bcf86cd799439011"}
+
+### 14. GET /tasks - Ana ve su tarea · 200
+GET {{baseUrl}}/api/v1/tasks
+Authorization: Bearer {{loginAna.response.body.accessToken}}
+
+### 15. GET /tasks - Bruno no la ve · 200 []
+GET {{baseUrl}}/api/v1/tasks
+Authorization: Bearer {{loginBruno.response.body.accessToken}}
+
+### 16. GET /tasks/:id - Bruno con el id de Ana · 404
+GET {{baseUrl}}/api/v1/tasks/{{tareaAna.response.body.id}}
+Authorization: Bearer {{loginBruno.response.body.accessToken}}
+
+### 17. PATCH /tasks/:id - Bruno con el id de Ana · 404
+PATCH {{baseUrl}}/api/v1/tasks/{{tareaAna.response.body.id}}
+Authorization: Bearer {{loginBruno.response.body.accessToken}}
+Content-Type: application/json
+
+{"titulo":"Ajena"}
+
+### 18. DELETE /tasks/:id - Bruno con el id de Ana · 404
+DELETE {{baseUrl}}/api/v1/tasks/{{tareaAna.response.body.id}}
+Authorization: Bearer {{loginBruno.response.body.accessToken}}
+
+### 19. PATCH /tasks/:id - Ana intenta cambiar propietario · 400
+PATCH {{baseUrl}}/api/v1/tasks/{{tareaAna.response.body.id}}
+Authorization: Bearer {{loginAna.response.body.accessToken}}
+Content-Type: application/json
+
+{"propietario":"{{loginBruno.response.body.usuario.id}}"}
+
+### 20. PATCH /tasks/:id - Ana completa su tarea · 200
+PATCH {{baseUrl}}/api/v1/tasks/{{tareaAna.response.body.id}}
+Authorization: Bearer {{loginAna.response.body.accessToken}}
+Content-Type: application/json
+
+{"estado":"completada"}
+
+###############################################################
+# Tokens inválidos (TODO 5)
+###############################################################
+
+### 21. GET /tasks - Sin token · 401
+GET {{baseUrl}}/api/v1/tasks
+
+### 22. GET /tasks - Token con formato inválido · 401
+GET {{baseUrl}}/api/v1/tasks
+Authorization: Bearer invalido
+
+### 23. GET /tasks - Token firmado con otro secreto · 401
+GET {{baseUrl}}/api/v1/tasks
+Authorization: Bearer {{$dotenv TOKEN_ALTERADO}}
+
+### 24. GET /tasks - Token vencido · 401
+GET {{baseUrl}}/api/v1/tasks
+Authorization: Bearer {{$dotenv TOKEN_VENCIDO}}
+
+###############################################################
+# Logout educativo y eliminación (TODO 7)
+###############################################################
+
+### 25. POST /logout - Ana · 200
+POST {{baseUrl}}/api/v1/auth/logout
+Authorization: Bearer {{loginAna.response.body.accessToken}}
+
+### 26. GET /tasks - El mismo token sigue válido hasta expirar · 200
+GET {{baseUrl}}/api/v1/tasks
+Authorization: Bearer {{loginAna.response.body.accessToken}}
+
+### 27. DELETE /tasks/:id - Ana elimina su tarea · 204
+DELETE {{baseUrl}}/api/v1/tasks/{{tareaAna.response.body.id}}
+Authorization: Bearer {{loginAna.response.body.accessToken}}
+
+### 28. GET /tasks/:id - Después del DELETE · 404
+GET {{baseUrl}}/api/v1/tasks/{{tareaAna.response.body.id}}
+Authorization: Bearer {{loginAna.response.body.accessToken}}
+
+###############################################################
+# Usuario inactivo (después de poner estado:false a Bruno en mongosh)
+###############################################################
+
+### 29. GET /tasks - Bruno inactivo con token vigente · 401
+GET {{baseUrl}}/api/v1/tasks
+Authorization: Bearer {{loginBruno.response.body.accessToken}}
+
+### 30. POST /login - Bruno inactivo · 401
+POST {{baseUrl}}/api/v1/auth/login
+Content-Type: application/json
+
+{"correo":"bruno.s24@example.com","contrasena":"{{passBruno}}"}
