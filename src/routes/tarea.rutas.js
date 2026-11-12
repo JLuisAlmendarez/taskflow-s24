@@ -1,0 +1,12 @@
+import { Router } from 'express';
+import * as controlador from '../controllers/tarea.controlador.js';
+import { autenticarJwt } from '../middlewares/autenticar.jwt.js';
+import { validarIdTarea, validarCreacion, validarActualizacion } from '../middlewares/tarea.validador.js';
+const router = Router();
+router.use(autenticarJwt);
+router.get('/', controlador.listar);
+router.get('/:id', validarIdTarea, controlador.obtener);
+router.post('/', validarCreacion, controlador.crear);
+router.patch('/:id', validarIdTarea, validarActualizacion, controlador.actualizar);
+router.delete('/:id', validarIdTarea, controlador.eliminar);
+export default router;
